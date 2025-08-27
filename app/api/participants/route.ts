@@ -21,6 +21,27 @@ export async function GET() {
   }
 }
 
+// PATCH /api/participants -> check if current user has been kicked
+export async function PATCH() {
+  try {
+    const { pollId, userId } = await getSession();
+    if (!pollId || !userId) return NextResponse.json({ kicked: false });
+
+    const participation = await prisma.participation.findFirst({
+      where: {
+        pollId,
+        userId,
+        kickedAt: { not: null },
+      },
+    });
+
+    return NextResponse.json({ kicked: !!participation });
+  } catch (e) {
+    console.error("/api/participants PATCH error", e);
+    return NextResponse.json({ kicked: false }, { status: 500 });
+  }
+}
+
 // POST /api/participants/kick -> body { userId }
 export async function POST(req: NextRequest) {
   try {

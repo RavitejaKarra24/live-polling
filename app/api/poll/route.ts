@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSession, setSession } from "../_utils/session";
+import { getSession } from "../_utils/session";
 
 // GET /api/poll -> returns current poll info for session
 export async function GET() {
@@ -10,5 +10,3 @@ export async function GET() {
   if (!poll) return NextResponse.json({ error: "No poll" }, { status: 404 });
   return NextResponse.json({ id: poll.id, code: poll.code, title: poll.title });
 }
-
-

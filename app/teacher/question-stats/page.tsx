@@ -18,13 +18,15 @@ export default function QuestionStatsPage() {
   const [options, setOptions] = useState<Option[]>([]);
   const [votes, setVotes] = useState<Record<string, number>>({});
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [pollCode, setPollCode] = useState<string>("");
 
   useEffect(() => {
     let cancel = false;
     const pull = async () => {
-      const [qRes, sRes] = await Promise.all([
+      const [qRes, sRes, pRes] = await Promise.all([
         fetch("/api/active-question"),
         fetch("/api/stats"),
+        fetch("/api/poll"),
       ]);
       if (!cancel) {
         if (qRes.ok) {
@@ -40,6 +42,10 @@ export default function QuestionStatsPage() {
           const v: Record<string, number> = {};
           for (const o of js.options ?? []) v[o.id] = o.count ?? 0;
           setVotes(v);
+        }
+        if (pRes.ok) {
+          const jp = await pRes.json();
+          setPollCode(jp.code || "");
         }
       }
       const h = await fetch("/api/history");
@@ -62,7 +68,24 @@ export default function QuestionStatsPage() {
     <div className="min-h-dvh w-full flex items-start justify-center">
       <main className="w-full max-w-5xl px-4 md:px-8 py-12">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-semibold">Question</h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-2xl font-semibold">Question</h2>
+            {pollCode && (
+              <div className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
+                <span className="text-sm font-medium text-gray-700">Code:</span>
+                <span className="font-mono font-bold text-gray-900">
+                  {pollCode}
+                </span>
+                <button
+                  onClick={() => navigator.clipboard.writeText(pollCode)}
+                  className="ml-1 text-gray-500 hover:text-gray-700"
+                  title="Copy to clipboard"
+                >
+                  📋
+                </button>
+              </div>
+            )}
+          </div>
           <Button
             className="h-10 rounded-full px-5 text-white"
             style={{
@@ -80,30 +103,63 @@ export default function QuestionStatsPage() {
             {question || "Which planet is known as the Red Planet?"}
           </div>
           <div className="p-4 space-y-3">
-            {options.map((op, idx) => {
-              const pct = votes[op.id] ?? 0;
-              return (
-                <div key={op.id} className="w-full rounded-md border bg-muted">
-                  <div
-                    className="flex items-center justify-between px-4 py-3 rounded-md text-white"
-                    style={{
-                      width: `${pct}%`,
-                      background: "#7765DA",
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#6B5AD9] text-white text-xs">
-                        {idx + 1}
-                      </span>
-                      <span>{op.text || `Option ${idx + 1}`}</span>
-                    </div>
-                    <span className="ml-auto pr-2 text-sm font-semibold">
-                      {pct}%
-                    </span>
-                  </div>
-                </div>
+            {(() => {
+              const totalVotes = Object.values(votes).reduce(
+                (sum, count) => sum + count,
+                0
               );
-            })}
+              return options.map((op, idx) => {
+                const voteCount = votes[op.id] ?? 0;
+                const percentage =
+                  totalVotes > 0
+                    ? Math.round((voteCount / totalVotes) * 100)
+                    : 0;
+                const isCorrect = op.correct;
+                return (
+                  <div
+                    key={op.id}
+                    className="w-full rounded-md border bg-muted"
+                  >
+                    <div className="flex items-center justify-between p-4 rounded-md">
+                      <div className="flex items-center gap-3 flex-1">
+                        <span
+                          className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-sm font-semibold ${
+                            isCorrect ? "bg-[#16a34a]" : "bg-[#6B5AD9]"
+                          }`}
+                        >
+                          {idx + 1}
+                        </span>
+                        <span className="text-sm font-medium flex-1">
+                          {op.text || `Option ${idx + 1}`}
+                        </span>
+                        {isCorrect && (
+                          <span className="text-xs bg-green-600 text-white px-2 py-1 rounded-full whitespace-nowrap">
+                            Correct
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4 ml-4">
+                        <div
+                          className="h-3 bg-gray-200 rounded-full overflow-hidden"
+                          style={{ width: "100px" }}
+                        >
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${Math.max(percentage, 5)}%`,
+                              background: isCorrect ? "#22c55e" : "#7765DA",
+                            }}
+                          />
+                        </div>
+                        <span className="text-sm font-semibold text-gray-700 min-w-[60px] text-right">
+                          {percentage}% ({voteCount})
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              });
+            })()}
           </div>
         </div>
 
@@ -122,27 +178,64 @@ export default function QuestionStatsPage() {
                   {q.text}
                 </div>
                 <div className="p-4 space-y-3">
-                  {q.options.map((o, idx: number) => (
-                    <div
-                      key={o.id}
-                      className="w-full rounded-md border bg-muted"
-                    >
-                      <div
-                        className="flex items-center justify-between px-4 py-3 rounded-md text-white"
-                        style={{ width: `${o.count}%`, background: "#7765DA" }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#6B5AD9] text-white text-xs">
-                            {idx + 1}
-                          </span>
-                          <span>{o.text}</span>
+                  {(() => {
+                    const totalVotes = q.options.reduce(
+                      (sum, o) => sum + o.count,
+                      0
+                    );
+                    return q.options.map((o, idx: number) => {
+                      const percentage =
+                        totalVotes > 0
+                          ? Math.round((o.count / totalVotes) * 100)
+                          : 0;
+                      const isCorrect = o.isCorrect;
+                      return (
+                        <div
+                          key={o.id}
+                          className="w-full rounded-md border bg-muted"
+                        >
+                          <div className="flex items-center justify-between p-4 rounded-md">
+                            <div className="flex items-center gap-3 flex-1">
+                              <span
+                                className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-sm font-semibold ${
+                                  isCorrect ? "bg-[#16a34a]" : "bg-[#6B5AD9]"
+                                }`}
+                              >
+                                {idx + 1}
+                              </span>
+                              <span className="text-sm font-medium flex-1">
+                                {o.text}
+                              </span>
+                              {isCorrect && (
+                                <span className="text-xs bg-green-600 text-white px-2 py-1 rounded-full whitespace-nowrap">
+                                  Correct
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-4 ml-4">
+                              <div
+                                className="h-3 bg-gray-200 rounded-full overflow-hidden"
+                                style={{ width: "100px" }}
+                              >
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{
+                                    width: `${Math.max(percentage, 5)}%`,
+                                    background: isCorrect
+                                      ? "#22c55e"
+                                      : "#7765DA",
+                                  }}
+                                />
+                              </div>
+                              <span className="text-sm font-semibold text-gray-700 min-w-[60px] text-right">
+                                {percentage}% ({o.count})
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <span className="ml-auto pr-2 text-sm font-semibold">
-                          {o.count}%
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                      );
+                    });
+                  })()}
                 </div>
               </div>
             ))}

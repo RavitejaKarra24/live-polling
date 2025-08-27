@@ -1,0 +1,109 @@
+// Datasource and generator
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum Role {
+  TEACHER
+  STUDENT
+}
+
+enum QuestionStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+// Core models
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  role      Role
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // relations
+  pollsCreated Poll[] @relation("TeacherPolls")
+  participations Participation[]
+  votes          Vote[]
+}
+
+model Poll {
+  id           String   @id @default(cuid())
+  code         String   @unique // short join code
+  title        String?
+  teacherId    String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  closedAt     DateTime?
+
+  teacher      User     @relation("TeacherPolls", fields: [teacherId], references: [id])
+  participants Participation[]
+  questions    Question[]
+}
+
+model Participation {
+  id        String   @id @default(cuid())
+  pollId    String
+  userId    String
+  kickedAt  DateTime?
+  joinedAt  DateTime @default(now())
+
+  poll      Poll     @relation(fields: [pollId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([pollId, userId])
+}
+
+model Question {
+  id          String          @id @default(cuid())
+  pollId      String
+  text        String
+  status      QuestionStatus  @default(DRAFT)
+  timeLimitMs Int             @default(60000) // default 60s
+  askedAt     DateTime?
+  closedAt    DateTime?
+  order       Int
+
+  poll        Poll            @relation(fields: [pollId], references: [id])
+  options     Option[]
+  votes       Vote[]
+
+  @@index([pollId])
+}
+
+model Option {
+  id         String   @id @default(cuid())
+  questionId String
+  text       String
+  isCorrect  Boolean  @default(false)
+  order      Int
+
+  question   Question @relation(fields: [questionId], references: [id])
+  votes      Vote[]
+
+  @@index([questionId])
+}
+
+model Vote {
+  id         String   @id @default(cuid())
+  questionId String
+  optionId   String
+  userId     String
+  createdAt  DateTime @default(now())
+
+  question   Question @relation(fields: [questionId], references: [id])
+  option     Option   @relation(fields: [optionId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@unique([questionId, userId])
+  @@index([optionId])
+}
+
+

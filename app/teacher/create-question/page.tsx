@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,29 @@ export default function CreateQuestionPage() {
     { id: crypto.randomUUID(), text: "", correct: false },
     { id: crypto.randomUUID(), text: "", correct: false },
   ]);
+  const [pollCode, setPollCode] = useState<string>("");
+
+  useEffect(() => {
+    const ensurePoll = async () => {
+      const hasPid = document.cookie.includes("pid=");
+      if (!hasPid) {
+        const res = await fetch("/api/bootstrap", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: "Teacher", role: "TEACHER" }),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (j?.code) setPollCode(j.code);
+      } else {
+        const r = await fetch("/api/poll");
+        if (r.ok) {
+          const j = await r.json();
+          setPollCode(j.code);
+        }
+      }
+    };
+    ensurePoll();
+  }, []);
 
   function addOption() {
     setOptions((o) => [
@@ -35,11 +58,44 @@ export default function CreateQuestionPage() {
     setOptions((o) => o.map((op) => (op.id === id ? { ...op, text } : op)));
   }
 
-  function onAsk() {
-    // Placeholder storage so student and stats pages can read the last question
-    const payload = { question, options, seconds };
-    sessionStorage.setItem("currentQuestion", JSON.stringify(payload));
-    router.push("/teacher/question-stats");
+  async function onAsk() {
+    try {
+      // Ensure poll exists; if not, bootstrap a teacher session and wait
+      let hasPid = document.cookie.includes("pid=");
+      if (!hasPid) {
+        const b = await fetch("/api/bootstrap", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: "Teacher", role: "TEACHER" }),
+        });
+        if (!b.ok) {
+          const j = await b.json().catch(() => ({}));
+          throw new Error(j?.error || "Failed to initialize poll");
+        }
+        const bj = await b.json().catch(() => ({}));
+        if (bj?.code) setPollCode(bj.code);
+        // Wait a tick for cookies to be persisted by the browser
+        await new Promise((r) => setTimeout(r, 50));
+        hasPid = document.cookie.includes("pid=");
+      }
+
+      const res = await fetch("/api/question", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: question,
+          timeLimitMs: seconds * 1000,
+          options: options.map((o) => ({ text: o.text, isCorrect: o.correct })),
+        }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.error || "Failed to create question");
+      }
+      router.push("/teacher/question-stats");
+    } catch (e) {
+      alert((e as Error).message || String(e));
+    }
   }
 
   return (
@@ -49,10 +105,15 @@ export default function CreateQuestionPage() {
           <Badge className="px-3 py-1 rounded-full bg-[#4F0DCE]/80 text-white">
             Intervue Poll
           </Badge>
-          <h1 className="text-3xl md:text-5xl font-semibold">
-            Let’s <span className="font-black">Get Started</span>
-          </h1>
+          {pollCode ? (
+            <span className="ml-2 text-sm rounded-full bg-[#F2F2F2] px-3 py-1 text-[#373737]">
+              Code: {pollCode}
+            </span>
+          ) : null}
         </div>
+        <h1 className="text-3xl md:text-5xl font-semibold mt-2">
+          Let’s <span className="font-black">Get Started</span>
+        </h1>
         <p className="text-muted-foreground mt-2 max-w-2xl">
           you’ll have the ability to create and manage polls, ask questions, and
           monitor your students&#39; responses in real-time.
@@ -116,12 +177,12 @@ export default function CreateQuestionPage() {
           <div>
             <h3 className="font-semibold">Is it Correct?</h3>
             <div className="mt-6 flex flex-col gap-6">
-              {options.map((op) => (
+              {options.map((op, idx) => (
                 <div key={op.id} className="flex items-center gap-6">
                   <label className="flex items-center gap-2">
                     <input
                       type="radio"
-                      name={`correct-${op.id}`}
+                      name={`correct-${idx}`}
                       checked={op.correct}
                       onChange={() => toggleCorrect(op.id, true)}
                     />
@@ -130,7 +191,7 @@ export default function CreateQuestionPage() {
                   <label className="flex items-center gap-2">
                     <input
                       type="radio"
-                      name={`correct-${op.id}`}
+                      name={`correct-${idx}`}
                       checked={!op.correct}
                       onChange={() => toggleCorrect(op.id, false)}
                     />

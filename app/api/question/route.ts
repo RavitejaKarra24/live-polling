@@ -1,15 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSession } from "../_utils/session";
+import { cookies } from "next/headers";
 
 // POST /api/question -> Teacher creates a new ACTIVE question
 // body: { text: string; timeLimitMs: number; options: { text: string; isCorrect?: boolean }[] }
 type IncomingOption = { text: string; isCorrect?: boolean };
 
 export async function POST(req: NextRequest) {
-  const { pollId, role } = await getSession();
-  if (!pollId || role !== "TEACHER")
-    return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+  const jar = await cookies();
+  const pollId = jar.get("pid")?.value;
+  const role = jar.get("role")?.value;
+  const uid = jar.get("uid")?.value;
+  if (!pollId) return NextResponse.json({ error: "No poll" }, { status: 403 });
+
+  // Authorize: teacher role or poll.teacherId === uid
+  if (role !== "TEACHER") {
+    const poll = await prisma.poll.findUnique({ where: { id: pollId } });
+    if (!poll || (uid && poll.teacherId !== uid)) {
+      return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+    }
+  }
 
   const body = await req.json();
   const text = String(body?.text || "").trim();
@@ -49,7 +59,9 @@ export async function POST(req: NextRequest) {
 
 // PATCH /api/question -> close the active question
 export async function PATCH() {
-  const { pollId, role } = await getSession();
+  const jar = await cookies();
+  const pollId = jar.get("pid")?.value;
+  const role = jar.get("role")?.value;
   if (!pollId || role !== "TEACHER")
     return NextResponse.json({ error: "Not authorized" }, { status: 403 });
   const updated = await prisma.question.updateMany({

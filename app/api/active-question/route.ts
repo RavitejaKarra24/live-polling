@@ -13,5 +13,13 @@ export async function GET() {
     orderBy: { order: "desc" },
     include: { options: { orderBy: { order: "asc" } } },
   });
-  return NextResponse.json({ question: q });
+  if (!q) return NextResponse.json({ question: null });
+
+  let remainingMs = q.timeLimitMs;
+  if (q.askedAt) {
+    const elapsed = Date.now() - new Date(q.askedAt).getTime();
+    remainingMs = Math.max(0, q.timeLimitMs - elapsed);
+  }
+
+  return NextResponse.json({ question: { ...q, remainingMs } });
 }

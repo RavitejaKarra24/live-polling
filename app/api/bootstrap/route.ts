@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { setSession } from "../_utils/session";
+import { cookies } from "next/headers";
 
 // POST /api/bootstrap
 // Body: { name: string; role: 'TEACHER'|'STUDENT'; pollCode?: string; title?: string }
@@ -24,12 +24,16 @@ export async function POST(req: NextRequest) {
     const poll = await prisma.poll.create({
       data: { code, title, teacherId: user.id },
     });
-    setSession({ userId: user.id, pollId: poll.id, role });
-    return NextResponse.json({
+    const res = NextResponse.json({
       userId: user.id,
       pollId: poll.id,
       code: poll.code,
     });
+    const jar = await cookies();
+    jar.set("uid", user.id, { httpOnly: false, sameSite: "lax" });
+    jar.set("pid", poll.id, { httpOnly: false, sameSite: "lax" });
+    jar.set("role", role, { httpOnly: false, sameSite: "lax" });
+    return res;
   }
 
   // student path
@@ -47,11 +51,14 @@ export async function POST(req: NextRequest) {
     update: {},
     create: { pollId: poll.id, userId: user.id },
   });
-
-  setSession({ userId: user.id, pollId: poll.id, role });
-  return NextResponse.json({
+  const res = NextResponse.json({
     userId: user.id,
     pollId: poll.id,
     code: poll.code,
   });
+  const jar = await cookies();
+  jar.set("uid", user.id, { httpOnly: false, sameSite: "lax" });
+  jar.set("pid", poll.id, { httpOnly: false, sameSite: "lax" });
+  jar.set("role", role, { httpOnly: false, sameSite: "lax" });
+  return res;
 }

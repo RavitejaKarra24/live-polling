@@ -2,27 +2,57 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import ChatParticipants from "@/components/ChatParticipants";
 
 type Option = { id: string; text: string; correct: boolean };
+type HistoryItem = {
+  id: string;
+  text: string;
+  order: number;
+  status: string;
+  options: { id: string; text: string; isCorrect: boolean; count: number }[];
+};
 
 export default function AnswerQuestionPage() {
   const [question, setQuestion] = useState<string>("");
   const [options, setOptions] = useState<Option[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number>(60);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
 
+  // poll the active question
   useEffect(() => {
-    const stored = sessionStorage.getItem("currentQuestion");
-    if (stored) {
-      const q = JSON.parse(stored) as {
-        question: string;
-        options: Option[];
-        seconds: number;
-      };
-      setQuestion(q.question);
-      setOptions(q.options);
-      setRemaining(q.seconds ?? 60);
-    }
+    let cancel = false;
+    const tick = async () => {
+      const res = await fetch("/api/active-question");
+      if (!cancel && res.ok) {
+        const j = await res.json();
+        const q = j.question as {
+          id: string;
+          text: string;
+          timeLimitMs: number;
+          remainingMs?: number;
+          askedAt?: string;
+          options: Option[];
+        } | null;
+        if (q) {
+          setQuestion(q.text);
+          setOptions(q.options);
+          const rem =
+            typeof q.remainingMs === "number"
+              ? q.remainingMs
+              : q.timeLimitMs ?? 60000;
+          setRemaining(Math.max(0, Math.round(rem / 1000)));
+        }
+      }
+      const h = await fetch("/api/history");
+      if (!cancel && h.ok) setHistory((await h.json()).questions ?? []);
+      if (!cancel) setTimeout(tick, 1000);
+    };
+    tick();
+    return () => {
+      cancel = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -30,13 +60,17 @@ export default function AnswerQuestionPage() {
     return () => clearInterval(id);
   }, []);
 
-  function onSubmit() {
-    // Placeholder: store last submitted option for demo
-    sessionStorage.setItem(
-      "studentAnswer",
-      JSON.stringify({ optionId: selected })
-    );
-    alert("Answer submitted!");
+  async function onSubmit() {
+    if (!selected) return;
+    const res = await fetch("/api/answer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ optionId: selected }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      alert(j?.error || "Failed to submit");
+    }
   }
 
   return (
@@ -91,6 +125,45 @@ export default function AnswerQuestionPage() {
           </Button>
         </div>
       </main>
+      <ChatParticipants canKick={false} />
+      {/* History */}
+      {history.length > 0 && (
+        <section className="w-full max-w-4xl px-4 md:px-8 py-8">
+          <h3 className="text-2xl font-semibold mb-4">View Poll History</h3>
+          <div className="flex flex-col gap-8">
+            {history.map((q) => (
+              <div key={q.id} className="rounded-lg border overflow-hidden">
+                <div className="bg-gradient-to-r from-zinc-700 to-zinc-400 text-white px-4 py-3 font-semibold">
+                  {q.text}
+                </div>
+                <div className="p-4 space-y-3">
+                  {q.options.map((o, idx: number) => (
+                    <div
+                      key={o.id}
+                      className="w-full rounded-md border bg-muted"
+                    >
+                      <div
+                        className="flex items-center justify-between px-4 py-3 rounded-md text-white"
+                        style={{ width: `${o.count}%`, background: "#7765DA" }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#6B5AD9] text-white text-xs">
+                            {idx + 1}
+                          </span>
+                          <span>{o.text}</span>
+                        </div>
+                        <span className="ml-auto pr-2 text-sm font-semibold">
+                          {o.count}%
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

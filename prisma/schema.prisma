@@ -32,6 +32,7 @@ model User {
   pollsCreated Poll[] @relation("TeacherPolls")
   participations Participation[]
   votes          Vote[]
+  messages       ChatMessage[]
 }
 
 model Poll {
@@ -46,6 +47,7 @@ model Poll {
   teacher      User     @relation("TeacherPolls", fields: [teacherId], references: [id])
   participants Participation[]
   questions    Question[]
+  messages     ChatMessage[]
 }
 
 model Participation {
@@ -104,6 +106,19 @@ model Vote {
 
   @@unique([questionId, userId])
   @@index([optionId])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  pollId    String
+  userId    String
+  text      String
+  createdAt DateTime @default(now())
+
+  poll Poll @relation(fields: [pollId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([pollId])
 }
 
 

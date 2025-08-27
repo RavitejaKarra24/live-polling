@@ -9,15 +9,24 @@ import { Button } from "@/components/ui/button";
 export default function StudentGetStartedPage() {
   const router = useRouter();
   const [name, setName] = useState("");
+  const [code, setCode] = useState("");
 
   useEffect(() => {
     const existing = sessionStorage.getItem("studentName");
     if (existing) setName(existing);
   }, []);
 
-  function onContinue() {
-    if (!name.trim()) return;
-    sessionStorage.setItem("studentName", name.trim());
+  async function onContinue() {
+    if (!name.trim() || !code.trim()) return;
+    await fetch("/api/bootstrap", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: name.trim(),
+        role: "STUDENT",
+        pollCode: code.trim().toUpperCase(),
+      }),
+    });
     router.push("/student/answer-question");
   }
 
@@ -45,6 +54,13 @@ export default function StudentGetStartedPage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="h-12 bg-muted"
+          />
+          <label className="text-base font-medium">Enter Join Code</label>
+          <Input
+            placeholder="ABC123"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            className="h-12 bg-muted uppercase tracking-widest"
           />
         </div>
 

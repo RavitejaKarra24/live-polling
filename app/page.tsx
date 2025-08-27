@@ -57,11 +57,22 @@ export default function Home() {
               background:
                 "linear-gradient(135deg, #5767D0 0%, #7765DA 50%, #4F0DCE 100%)",
             }}
-            onClick={() => {
-              // Placeholder: route namespaces to be implemented later
-              if (selectedRole === "teacher")
+            onClick={async () => {
+              if (selectedRole === "teacher") {
+                // Always create a fresh poll for a teacher entry
+                const res = await fetch("/api/bootstrap", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ name: "Teacher", role: "TEACHER" }),
+                });
+                if (!res.ok) {
+                  alert("Failed to start a new poll");
+                  return;
+                }
                 router.push("/teacher/create-question");
-              else router.push("/student/get-started");
+              } else {
+                router.push("/student/get-started");
+              }
             }}
           >
             Continue

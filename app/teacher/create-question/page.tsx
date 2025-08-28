@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +19,7 @@ export default function CreateQuestionPage() {
     { id: crypto.randomUUID(), text: "", correct: false },
   ]);
   const [pollCode, setPollCode] = useState<string>("");
+  const [copied, setCopied] = useState<boolean>(false);
 
   useEffect(() => {
     const ensurePoll = async () => {
@@ -102,13 +104,30 @@ export default function CreateQuestionPage() {
     <div className="min-h-dvh w-full flex items-start justify-center">
       <main className="w-full max-w-5xl px-4 md:px-8 py-12">
         <div className="flex items-center gap-3">
-          <Badge className="px-3 py-1 rounded-full bg-[#4F0DCE]/80 text-white">
+          <Badge
+            className="px-3 py-1 rounded-full text-white"
+            style={{
+              background:
+                "linear-gradient(135deg, #5767D0 0%, #7765DA 50%, #4F0DCE 100%)",
+            }}
+          >
             Intervue Poll
           </Badge>
           {pollCode ? (
-            <span className="ml-2 text-sm rounded-full bg-[#F2F2F2] px-3 py-1 text-[#373737]">
-              Code: {pollCode}
-            </span>
+            <button
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(pollCode);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1200);
+                } catch {}
+              }}
+              className="ml-2 text-sm rounded-full bg-[#F2F2F2] px-3 py-1 text-[#373737] flex items-center gap-2"
+              title="Copy code"
+            >
+              {copied ? <Check size={16} /> : <Copy size={16} />}
+              <span>Code: {pollCode}</span>
+            </button>
           ) : null}
         </div>
         <h1 className="text-3xl md:text-5xl font-semibold mt-2">

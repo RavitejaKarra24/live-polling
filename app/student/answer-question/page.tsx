@@ -20,6 +20,7 @@ export default function AnswerQuestionPage() {
   const [remaining, setRemaining] = useState<number>(60);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [hasAnswered, setHasAnswered] = useState<boolean>(false);
 
   const [currentQuestionId, setCurrentQuestionId] = useState<string | null>(
     null

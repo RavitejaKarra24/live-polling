@@ -22,7 +22,13 @@ export default function Home() {
     <div className="min-h-dvh w-full flex items-center justify-center">
       <main className="w-full max-w-5xl px-4 md:px-8">
         <div className="flex flex-col items-center text-center gap-3">
-          <Badge className="px-3 py-1 rounded-full bg-[#F2F2F2] text-[#373737]">
+          <Badge
+            className="px-3 py-1 rounded-full text-white"
+            style={{
+              background:
+                "linear-gradient(135deg, #5767D0 0%, #7765DA 50%, #4F0DCE 100%)",
+            }}
+          >
             Intervue Poll
           </Badge>
           <h1 className="text-3xl md:text-5xl font-semibold tracking-[-0.02em]">

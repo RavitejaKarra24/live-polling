@@ -82,6 +82,12 @@ export default function AnswerQuestionPage() {
           // No active question
           setCurrentQuestionId(null);
         }
+      } else if (!cancel && res.status === 403) {
+        const j = await res.json().catch(() => ({}));
+        if (j?.kicked) {
+          window.location.href = "/student/kicked";
+          return;
+        }
       }
       const h = await fetch("/api/history");
       if (!cancel && h.ok) {

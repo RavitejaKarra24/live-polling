@@ -11,6 +11,13 @@ export async function GET() {
       { status: 400 }
     );
 
+  // Early check: if kicked, signal to client to redirect
+  const kicked = await prisma.participation.findFirst({
+    where: { pollId, userId, kickedAt: { not: null } },
+    select: { id: true },
+  });
+  if (kicked) return NextResponse.json({ kicked: true }, { status: 403 });
+
   // Get all questions for this poll (both active and closed)
   const allQuestions = await prisma.question.findMany({
     where: { pollId },
